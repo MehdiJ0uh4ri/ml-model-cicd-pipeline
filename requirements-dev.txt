@@ -1,0 +1,13 @@
+-r requirements.txt
+
+# The MLOps toolchain. Everything here is optional at runtime: each module
+# degrades to a local, offline-equivalent implementation when the import
+# fails, so `make ci` works on a laptop with no network. See docs/backends.md.
+mlflow==2.19.0
+dvc==3.59.0
+great-expectations==1.2.4
+evidently==0.5.1
+scipy==1.14.1
+
+pytest==8.3.4
+ruff==0.8.4

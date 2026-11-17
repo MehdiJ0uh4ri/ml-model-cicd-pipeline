@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# DVC-tracked outputs: the .dvc pointers are committed, the bytes are not.
+/data/raw/
+/data/processed/
+/artifacts/
+/dvcstore/
+
+# Local stand-ins for the tracking server and the model registry. Both are
+# real services in production; committing their on-disk form would make the
+# repo the source of truth for what is in production, which it is not.
+/mlruns/
+/mlruns-local/
+/registry/
+/traffic/*.jsonl
+/traffic/*.labels.json
+
+.env
