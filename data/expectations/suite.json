@@ -1,0 +1,97 @@
+{
+  "expectation_suite_name": "applications.raw",
+  "meta": {
+    "notes": "Great Expectations suite in GE's own JSON format. Run by data/validate.py, which uses the great_expectations library when it is installed and an equivalent local evaluator when it is not -- the suite file is the single source of truth either way.",
+    "owner": "risk-modelling",
+    "great_expectations_version": "1.2.4"
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 10000, "max_value": 200000 },
+      "meta": { "why": "A snapshot smaller than 10k rows is an extraction failure, not a small week." }
+    },
+    {
+      "expectation_type": "expect_table_columns_to_match_set",
+      "kwargs": {
+        "column_set": [
+          "application_id", "income", "debt_ratio", "credit_lines",
+          "late_payments_2y", "utilization", "account_age_months",
+          "employment", "region", "housing", "age_group",
+          "snapshot_date", "default"
+        ]
+      },
+      "meta": { "why": "Schema drift upstream must fail here, not as a KeyError inside training." }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": { "column": "application_id" },
+      "meta": { "why": "Duplicate applications leak between train and test splits." }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "income", "mostly": 0.99 },
+      "meta": { "why": "Up to 1% missing income is imputable; beyond that the feature is unusable." }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "default", "mostly": 1.0 },
+      "meta": { "why": "A null label is silently dropped by most trainers. Never allow it." }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "income", "min_value": 0, "max_value": 2000000, "mostly": 0.999 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "utilization", "min_value": 0.0, "max_value": 1.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "debt_ratio", "min_value": 0.0, "max_value": 5.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "late_payments_2y", "min_value": 0, "max_value": 40 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": { "column": "default", "value_set": [0, 1] }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "employment",
+        "value_set": ["salaried", "self_employed", "contract", "retired", "unemployed"]
+      },
+      "meta": { "why": "A new category one-hot-encodes to all zeros and degrades the model quietly." }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": { "column": "region", "value_set": ["north", "south", "east", "west"] }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": { "column": "housing", "value_set": ["own", "rent", "mortgage"] }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": { "column": "age_group", "value_set": ["18-25", "26-40", "41-60", "60+"] }
+    },
+    {
+      "expectation_type": "expect_column_mean_to_be_between",
+      "kwargs": { "column": "default", "min_value": 0.12, "max_value": 0.45 },
+      "meta": { "why": "Class balance moving outside this band invalidates the committed thresholds." }
+    },
+    {
+      "expectation_type": "expect_column_mean_to_be_between",
+      "kwargs": { "column": "utilization", "min_value": 0.30, "max_value": 0.50 },
+      "meta": { "why": "Cheap distribution check: catches an upstream unit change (0-1 vs 0-100)." }
+    },
+    {
+      "expectation_type": "expect_column_proportion_of_unique_values_to_be_between",
+      "kwargs": { "column": "region", "min_value": 0.0, "max_value": 0.001 },
+      "meta": { "why": "A categorical that suddenly looks high-cardinality is a join gone wrong." }
+    }
+  ]
+}
