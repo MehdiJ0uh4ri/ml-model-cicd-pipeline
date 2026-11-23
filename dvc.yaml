@@ -1,0 +1,73 @@
+# The pipeline as DVC sees it. `dvc repro` re-runs only what a changed
+# dependency invalidated: edit thresholds.yaml and the gate re-decides without
+# retraining; edit params.yaml:model and training re-runs but the snapshot is
+# reused from cache.
+#
+# CI runs the same stages through the Makefile so that a developer without DVC
+# installed is never blocked. `make repro` is the DVC path; `make pipeline` is
+# the plain one. They must stay equivalent -- tests/test_pipeline_parity.py
+# checks the command strings match.
+
+stages:
+  snapshot:
+    cmd: python -m data.generate --params params.yaml --out data/raw/applications.parquet
+    deps:
+      - data/generate.py
+    params:
+      - data
+    outs:
+      - data/raw/applications.parquet
+      - data/raw/applications.meta.json:
+          cache: false
+
+  validate:
+    cmd: python -m data.validate --data data/raw/applications.parquet --json-out artifacts/data_validation.json --markdown artifacts/data_validation.md
+    deps:
+      - data/validate.py
+      - data/expectations/suite.json
+      - data/raw/applications.parquet
+    outs:
+      - artifacts/data_validation.json:
+          cache: false
+      - artifacts/data_validation.md:
+          cache: false
+
+  train:
+    cmd: python -m src.model.train
+    deps:
+      - src/model/train.py
+      - src/model/features.py
+      - src/model/tracking.py
+      - data/raw/applications.parquet
+      - artifacts/data_validation.json
+    params:
+      - model
+      - features
+    outs:
+      - artifacts/model.joblib
+    metrics:
+      - artifacts/train_metrics.json:
+          cache: false
+
+  evaluate:
+    cmd: python -m src.model.evaluate
+    deps:
+      - src/model/evaluate.py
+      - artifacts/model.joblib
+      - data/raw/applications.parquet
+    metrics:
+      - artifacts/scorecard.json:
+          cache: false
+
+  gate:
+    cmd: python -m src.model.gate
+    deps:
+      - src/model/gate.py
+      - artifacts/scorecard.json
+      - baselines/champion.json
+      - thresholds.yaml
+    outs:
+      - artifacts/verdict.json:
+          cache: false
+      - artifacts/report.md:
+          cache: false

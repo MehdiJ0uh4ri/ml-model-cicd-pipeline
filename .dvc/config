@@ -1,0 +1,13 @@
+[core]
+    remote = local
+    autostage = true
+
+# A directory remote by default so `dvc push` works in a clone with no cloud
+# credentials. CI overrides it with `dvc remote modify --local` against S3;
+# see docs/runbook.md. The point of committing a remote at all is that
+# `dvc pull` in a fresh checkout must never require tribal knowledge.
+['remote "local"']
+    url = ../dvcstore
+
+['remote "s3"']
+    url = s3://acme-ml-artifacts/credit-default-risk
