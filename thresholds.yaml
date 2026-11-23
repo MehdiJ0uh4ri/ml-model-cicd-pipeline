@@ -1,0 +1,74 @@
+# The contract between a training run and production. CODEOWNERS-gated:
+# loosening a floor is a reviewed change, not a commit that slips through
+# with a red build.
+
+# Absolute floors. A model below any of these never reaches the registry,
+# even if it beats the baseline -- "better than a bad champion" is not a
+# release criterion. Each floor sits roughly 3-4% below what the current
+# champion scores: close enough to catch a real regression, far enough that a
+# reseeded run does not block a healthy model. docs/thresholds.md shows the
+# measurements these were set from.
+floors:
+  roc_auc: 0.820
+  pr_auc: 0.660
+  accuracy: 0.780
+  recall: 0.620
+  # Brier score is a loss: lower is better. Serving thresholds a probability,
+  # so a miscalibrated model is a production bug even at equal AUC.
+  brier_score_max: 0.140
+
+# Regression guard against the committed baseline (the current champion's
+# scorecard on this test set). Tolerances absorb seed noise; they are not
+# permission to drift downward release after release.
+regression:
+  roc_auc_drop_max: 0.010
+  pr_auc_drop_max: 0.020
+  recall_drop_max: 0.030
+  brier_rise_max: 0.010
+
+# Aggregate metrics hide a broken slice. Each protected group carries its own
+# floor, and the spread between the best and worst group is capped.
+fairness:
+  group_column: age_group
+  min_group_support: 200
+  per_group_roc_auc_min: 0.780
+  # Selection rate parity: max - min across groups.
+  demographic_parity_diff_max: 0.090
+  # TPR parity: the metric that matters when the positive class is "denied".
+  equal_opportunity_diff_max: 0.120
+
+# Broken measurement must fail with its own message rather than masquerade as
+# a quality regression.
+integrity:
+  min_test_rows: 3000
+  max_prediction_nan_rate: 0.0
+  # Training data and evaluation data must come from the same DVC hash.
+  require_matching_data_hash: true
+
+# Post-registry promotion. Shadow proves the model runs on real traffic;
+# canary proves it behaves on a slice of it.
+shadow:
+  min_requests: 2000
+  max_error_rate: 0.001
+  # p95 latency of the challenger, relative to the champion.
+  p95_latency_ratio_max: 1.30
+  # A challenger that disagrees with the champion on nearly every request is
+  # either a huge improvement or a wiring bug. Flag it for review.
+  max_disagreement_rate: 0.150
+
+canary:
+  traffic_percent: 5
+  # Counted on the canary slice, not the window: at 5% this needs ~5,000
+  # requests through the service. Production would set this from the smallest
+  # effect worth catching; 250 is what a demo-sized replay can supply.
+  min_requests: 250
+  # Canary is compared against the champion's live numbers over the same
+  # window, not against the offline test set.
+  max_error_rate: 0.005
+  p95_latency_ms_max: 120
+  # Business metric, not a model metric: the one that triggers rollback.
+  # Two-sided. Declining more applicants than the champion costs revenue;
+  # declining fewer costs credit losses. Either move of this size means the
+  # live decision mix is not the one that was signed off offline.
+  decision_rate_shift_max: 0.030
+  auto_rollback: true
