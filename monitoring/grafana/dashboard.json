@@ -1,0 +1,146 @@
+{
+  "title": "Model promotion — champion vs challenger",
+  "uid": "model-promotion",
+  "tags": ["ml", "canary", "shadow"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Canary traffic",
+      "description": "0% means either no canary is running or one just finished. Sustained non-zero for hours is the CanaryStuck alert.",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "orange", "value": 25 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "canary_traffic_percent", "refId": "A" }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Shadow errors (10m)",
+      "description": "Challenger failures caught by the shadow wrapper. Never user-visible; always blocking for promotion.",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "increase(shadow_errors_total[10m])", "refId": "A" }]
+    },
+    {
+      "id": 3,
+      "type": "gauge",
+      "title": "Disagreement rate",
+      "description": "Share of requests where the two models would decide differently. The threshold mirrors thresholds.yaml:shadow.max_disagreement_rate.",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 0.5,
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.15 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "model_disagreement_rate", "refId": "A" }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Requests by arm (5m)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        { "expr": "increase(inference_requests_total[5m])", "legendFormat": "{{arm}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "p95 latency by arm",
+      "description": "The canary guard is an absolute p95 ceiling; shadow uses a ratio against the champion. Both are visible here.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "lineWidth": 2, "fillOpacity": 5 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 120 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "expr": "inference_latency_p95_ms", "legendFormat": "{{arm}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Decline rate by arm",
+      "description": "The business metric that triggers auto-rollback. A gap that opens and stays open is a revenue incident, not a modelling curiosity.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "custom": { "lineWidth": 2 } }
+      },
+      "targets": [
+        { "expr": "model_positive_rate", "legendFormat": "{{arm}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Decline-rate gap (challenger − champion)",
+      "description": "Flat at zero is the healthy state; the guard is two-sided. thresholds.yaml:canary.decision_rate_shift_max is the red line.",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.03 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "model_positive_rate{arm=\"challenger\"} - model_positive_rate{arm=\"champion\"}",
+          "legendFormat": "gap",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}
