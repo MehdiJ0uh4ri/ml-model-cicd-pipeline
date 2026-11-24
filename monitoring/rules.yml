@@ -1,0 +1,38 @@
+# Alerts that mirror the canary guards. The pipeline rolls back on its own;
+# these exist for the window between two canary evaluations, and for the
+# failure modes that only appear under sustained production load.
+groups:
+  - name: model-serving
+    rules:
+      - alert: ShadowScoringFailing
+        expr: increase(shadow_errors_total[10m]) > 5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Challenger is raising on real payloads
+          description: >-
+            The shadow path caught {{ $value }} errors in 10m. Users are
+            unaffected, but this challenger is not canary-ready.
+
+      - alert: CanaryLatencyRegression
+        expr: inference_latency_p95_ms{arm="challenger"} > 120
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: Canary p95 above the promotion threshold
+
+      - alert: DecisionRateDivergence
+        expr: abs(model_positive_rate{arm="challenger"} - model_positive_rate{arm="champion"}) > 0.03
+        for: 15m
+        labels: { severity: critical }
+        annotations:
+          summary: Canary is declining a materially different share of applicants
+          description: The business guard in thresholds.yaml:canary.decision_rate_shift_max.
+
+      - alert: CanaryStuck
+        expr: canary_traffic_percent > 0
+        for: 6h
+        labels: { severity: warning }
+        annotations:
+          summary: Canary has been live for 6h without a promote or rollback
+          description: A canary nobody finished is a second production model.
