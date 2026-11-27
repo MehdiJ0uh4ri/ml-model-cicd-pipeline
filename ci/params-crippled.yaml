@@ -1,0 +1,47 @@
+# A deliberately bad model, used by `make demo-bad-model` to prove the
+# evaluation gate blocks rather than merely reports. One boosting round on a
+# single leaf is barely better than the base rate -- the floors in
+# thresholds.yaml should refuse it outright.
+#
+# Everything except `model` is identical to params.yaml. Keep it that way:
+# the demo must isolate model quality, not change the data underneath.
+
+data:
+  seed: 20260101
+  n_rows: 24000
+  snapshot: "2026-09-01"
+  test_size: 0.2
+  inject:
+    null_rate: 0.004
+    label_flip: 0.0
+
+features:
+  numeric:
+    - income
+    - debt_ratio
+    - credit_lines
+    - late_payments_2y
+    - utilization
+    - account_age_months
+  categorical:
+    - employment
+    - region
+    - housing
+  protected: age_group
+
+model:
+  kind: hist_gradient_boosting
+  max_iter: 1
+  learning_rate: 0.01
+  max_leaf_nodes: 2
+  min_samples_leaf: 8000
+  l2_regularization: 0.0
+  early_stopping: false
+  validation_fraction: 0.12
+  random_state: 20260101
+  decision_threshold: 0.38
+
+registry:
+  model_name: credit-default-risk
+  champion_alias: champion
+  challenger_alias: challenger

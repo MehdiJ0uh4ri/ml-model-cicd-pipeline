@@ -1,0 +1,60 @@
+# A challenger that is genuinely good and still must not ship.
+#
+# Identical to params.yaml except for the decision threshold, moved from 0.38
+# to 0.30. Every offline metric the eval gate looks at either improves or
+# holds -- ROC-AUC and Brier are threshold-free, recall goes *up*, accuracy
+# stays above its floor -- so `make demo-rollback` passes the eval gate and
+# passes shadow. What it changes is the live decision mix: ~6% more applicants
+# declined. Only the canary's business guard sees that.
+#
+# This is the case that justifies having a canary at all. A pipeline that
+# stops at the eval gate ships this model.
+
+data:
+  seed: 20260101
+  n_rows: 24000
+  # Bumping this simulates a new data snapshot arriving. The DVC hash of
+  # data/raw/ changes, `dvc repro` retrains, the eval gate re-decides.
+  snapshot: "2026-09-01"
+  test_size: 0.2
+  # Deliberate, documented defects the expectation suite is meant to catch
+  # when they exceed tolerance. 0.0 = clean snapshot.
+  inject:
+    null_rate: 0.004
+    label_flip: 0.0
+
+features:
+  numeric:
+    - income
+    - debt_ratio
+    - credit_lines
+    - late_payments_2y
+    - utilization
+    - account_age_months
+  categorical:
+    - employment
+    - region
+    - housing
+  # Never a feature. Used only to slice metrics in the fairness check.
+  protected: age_group
+
+model:
+  kind: hist_gradient_boosting
+  max_iter: 220
+  learning_rate: 0.06
+  max_leaf_nodes: 24
+  min_samples_leaf: 40
+  l2_regularization: 0.6
+  early_stopping: true
+  validation_fraction: 0.12
+  random_state: 20260101
+  # Chosen on the validation split, not on test. Written into the model
+  # artifact so serving cannot silently disagree with evaluation.
+  decision_threshold: 0.30
+
+registry:
+  model_name: credit-default-risk
+  # Aliases, not stages: MLflow deprecated stages in 2.9. `champion` is what
+  # serving loads, `challenger` is what shadow/canary exercise.
+  champion_alias: champion
+  challenger_alias: challenger
